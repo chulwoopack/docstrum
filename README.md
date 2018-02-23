@@ -4,7 +4,7 @@ This repo is for developing a Docstrum algorithm presented by O’Gorman (1993).
 
 # Output
 ## Detected k-nearest neighbors
-![Detected k-nearest neighbors](https://github.com/chulwoopack/docstrum/blob/master/output/test.png | width=20)
+![Detected k-nearest neighbors](https://github.com/chulwoopack/docstrum/blob/master/output/test.png){:height="50%" width="50%"}
 ## Docstrum
 ![Detected k-nearest neighbors](https://github.com/chulwoopack/docstrum/blob/master/docstrums/test.png = 40x40)
 
