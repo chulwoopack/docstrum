@@ -7,6 +7,9 @@ This repo is for developing a Docstrum algorithm presented by O’Gorman (1993).
 | k-nearest neighbors  | Docstrum |
 | ------------- | ------------- |
 | <img src="https://github.com/chulwoopack/docstrum/blob/master/output/test.png" width="400px" height="400px" />  | <img src="https://github.com/chulwoopack/docstrum/blob/master/docstrums/test.png" width="400px" height="400px" />  |
+| NN angle histogram  | NN distance histogram |
+| ------------- | ------------- |
+| <img src="https://github.com/chulwoopack/docstrum/blob/master/output/test.png" width="400px" height="400px" /> | <img src="https://github.com/chulwoopack/docstrum/blob/master/output/test.png" width="400px" height="400px" /> |
 
 
 # Notes
