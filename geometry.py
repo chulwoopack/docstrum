@@ -216,7 +216,7 @@ class Point:
         return result
 
     def paint(self, image, color, diameter=3):
-        cv2.circle(image, self.cv2point(), diameter, color, 3, cv2.CV_AA)
+        cv2.circle(image, self.cv2point(), diameter, color, 1, cv2.CV_AA)
         return image
 
     @staticmethod
@@ -253,6 +253,7 @@ class Line:
         self.start = None
         self.end = None
         self.angle = None
+        self.group = None
 
         if inputAngle != None:
             inputAngle = Angle(inputAngle)
@@ -356,7 +357,7 @@ class Line:
         if (self.start is None) or (self.end is None):
             raise Exception('The Line is underspecified; it requires at least two points')
         else:
-            cv2.line(image, self.start.cv2point(), self.end.cv2point(), color, 4, cv2.CV_AA)
+            cv2.line(image, self.start.cv2point(), self.end.cv2point(), color, 1, cv2.CV_AA)
 
         return image
 

@@ -24,10 +24,15 @@ class Page:
 
         self.showSteps = showSteps
         self.saveDocstrum = saveDocstrum
+        self.lines = []
         greyscaleImage = cv2.imread(path, cv2.CV_LOAD_IMAGE_GRAYSCALE)
+        self.display(greyscaleImage)
         
         # PREPROCESSING START - NOISE REMOVAL
         #greyscaleImage = cv2.medianBlur(greyscaleImage,3)
+        kernel = numpy.ones((5,5),numpy.uint8)
+        greyscaleImage = cv2.erode(greyscaleImage,kernel,iterations = 1)
+        self.display(greyscaleImage)
         # PREPROCESSING STOP
         
         colorImage = cv2.imread(path, cv2.CV_LOAD_IMAGE_COLOR)
@@ -37,9 +42,23 @@ class Page:
 
         self.characters = text.CharacterSet(greyscaleImage)
         stopwatch.lap("got characters")
+        # words = [word, word, ..., word]
+        # words = [append, count, extend, index, insert, pop, remove, reverse, sort]
+        # word  = [angles, characters, distances, findTuples, paint, registerChildCharacter]
+        # word  = [char, char, ..., char]
+        # char = [nearestNeighbors, parentWord, x, y]
         self.words = self.characters.getWords()
         stopwatch.lap("got words & tuples")
+        
+        print "Total ", len(self.words), " words are found."
+        #for idx, word in enumerate(self.words):
+        #    print "[",idx,"] word:"
+        #    for idx_char, character in enumerate(word.characters):
+        #        print "**[", idx_char, "] char info.. ", "(",character.x,",",character.y,")"
+        
         #print "Tuple 1: (",self.words[1].angles[1], ", ", self.words[1].distances[1], ")"
+        
+        
         self.buildDocstrum(path)
         stopwatch.lap("built Docstrum")
         #theta = self.words[1].angles
@@ -53,6 +72,11 @@ class Page:
 
         stopwatch.lap("finished analysing page")
         stopwatch.endRun()
+        
+        #self.drawTextLine(self.words,colorImage)
+        #self.paint(self.image)
+        self.paint_textline(self.image)
+        #self.display(self.paint_textline(self.image))
         
     def nnAngleHist(self, theta, path):
         #print "theta from hist: ", theta
@@ -71,7 +95,8 @@ class Page:
         if self.saveDocstrum:
             plt.savefig(os.path.join(os.path.abspath("./docstrums"),"ds_nnDist_" + ntpath.basename(path)))
         plt.show()
-        
+    
+    
     def buildDocstrum(self, path):
         theta = []
         theta_hist = []
@@ -99,7 +124,9 @@ class Page:
             plt.show()
             self.nnAngleHist(theta_hist,path)
             self.nnDistHist(dist_hist,path)
-        
+    
+    ''' paint '''
+    ''' color words '''
     def paint(self, image):
 
         print len(self.words)
@@ -107,11 +134,38 @@ class Page:
             image = word.paint(image, colors.RED)
 
         return image
+    
+    def paint_textline(self, image):
+        ratio = 4.0/8.0
+        for word in self.words:
+            #dir(word)
+            #word.angles
+            points = []
+            multiplier = 1
+            for character in word.characters:
+                #print "(",character.x,", ",character.y,")"
+                #print "nn: ", character.nearestNeighbors
+                points.append([character.x, character.y])
+            points.sort(key=lambda x: x[0])
+            #print(points)
+            w = max(points,key=lambda x: x[0])[0]-min(points,key=lambda x: x[0])[0]
+            #print(w)
+            h = max(points,key=lambda x: x[1])[1]-min(points,key=lambda x: x[1])[1]
+            #print(h)
+            dx, dy, x0, y0 = cv2.fitLine(numpy.array(points), cv2.cv.CV_DIST_L2, 0, 0.01, 0.01)
+            start = (int(x0 - dx*w*ratio), int(y0 - dy*w*ratio))
+            #start = (int(x0 - dx*w), int(y0 - dy*w))
+            end = (int(x0 + dx*w*ratio), int(y0 + dy*w*ratio))
+            #print(start,end)
+            self.lines.append(g.Line([start,end]))
+            cv2.line(image, start, end, (0,255,255),2)
+        return image
 
     def save(self, path):
 
         image = self.image.copy()
         image = self.paint(image)
+        #image = self.paint_textline(image)
         cv2.imwrite(path, image)
 
     def display(self, image, boundingBox=(800,800), title='Image'):

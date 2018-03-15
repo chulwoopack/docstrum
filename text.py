@@ -53,6 +53,8 @@ class Character:
     def __contains__(self, item):
         return self.coordinate.__contains__(item)
 
+    ''' paint '''
+    ''' paint a dot on the centroid of a character '''
     def paint(self, image, color=colors.YELLOW):
 
         pointObj = g.Point(self.coordinate)
@@ -68,6 +70,8 @@ class CharacterSet:
         #self.angles = []
         #self.distances = []
 
+    ''' getCharacters '''
+    ''' This function (1) binarize a source image (2) get contours (characters) (3) get its centroid  '''
     def getCharacters(self, sourceImage):
 
         characters = []
@@ -76,8 +80,9 @@ class CharacterSet:
         image = threshold(image)
         image = threshold(image, cv2.THRESH_OTSU, method=cv2.THRESH_BINARY)
 
-        if False:
-            self.display(image)
+        if True:
+            cv2.imshow('binarized', image)
+            cv2.waitKey()
 
         for contour in self.getContours(image):
             try:
@@ -91,17 +96,27 @@ class CharacterSet:
             except ZeroDivisionError:
                 continue
                 
-            if box.area > 50:
+            #if box.area > 50:
+            if box.area > 10:
+            #if True:
                 characters.append(character)
 
+        print "Total ", len(characters), " characters are found."
         return characters
 
+    ''' getContours         '''
+    ''' Input: Binary Image '''
+    ''' Output: BLOBs       '''
     def getContours(self, sourceImage, threshold=-1):
-
         image = sourceImage.copy()
         blobs = []
         topLevelContours = []
 
+        # cv2.findContours : It stores the (x,y) coordinates of the boundary of a shape. Here, contours are the boundaries of a shape with same intensity.
+        # CHAIN_APPROX_NONE : All the boundary points are stored.
+        # CHAIN_APPROX_SIMPLE : It removes all redundant points and compresses the contour, thereby saving memory.
+        # hierarchy = [Next, Previous, First_Child, Parent]
+        # REFERENCE : https://docs.opencv.org/3.1.0/d4/d73/tutorial_py_contours_begin.html
         contours, hierarchy = cv2.findContours(image, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
         for i in range(len(hierarchy[0])):
@@ -119,11 +134,59 @@ class CharacterSet:
 
         return topLevelContours
 
+    ''' transitiveClosure '''
+    ''' Obtain nearest-neighbor groups on the same text lines with the use of a transitive closure on within-line nearest neighbor pairings '''
+    '''    
+    def transitiveClosure(self):
+
+        self.characters = sorted(self.characters, key=lambda char: (char.y, char.x))
+#        self.characters = sorted(self.characters, key=lambda char: char.x)
+        for idx, character in enumerate(self.characters):
+            print "[",idx,"] character's nn info..", "(",character.x,",",character.y,")"
+            character.nearestNeighbours = sorted(character.nearestNeighbours, key=lambda nn_char: nn_char.x)
+            # for each character's nn [checking purpose.. it can be removed later]
+            for idx_nn, character_nn in enumerate(character.nearestNeighbours):
+                print "**[", idx_nn, "] nn info.. ", "(",character_nn.x,",",character_nn.y,")"
+
+        within_line_nn_groups = []
+        within_line_nn_group = []
+        
+        start_flag = True
+        end_flag = False
+        
+        self.characters = sorted(self.characters, key=lambda char: (char.y, char.x))
+#        self.characters = sorted(self.characters, key=lambda char: char.x)
+        # for each character
+        for idx, character in enumerate(self.characters):
+            if start_flag:
+                within_line_nn_group.append(character)
+            character.nearestNeighbours = sorted(character.nearestNeighbours, key=lambda nn_char: nn_char.x)
+            if len(character.nearestNeighbours)>0:
+                # start char of group
+                if start_flag:
+                    within_line_nn_group.append(character.nearestNeighbours[0])
+                    start_flag = False
+                # end char of group
+                elif ((idx+1)==len(self.characters) or len(character.nearestNeighbours)<2 or  character.nearestNeighbours[1].x != self.characters[idx+1].x):
+                    end_flag = True
+                    within_line_nn_groups.append(within_line_nn_group)
+                    within_line_nn_group = []
+                    start_flag = True
+                # mid char of group
+                else:
+                    within_line_nn_group.append(character.nearestNeighbours[1])
+        print "Found group: ", within_line_nn_groups
+    '''
+        
+    ''' getWords '''
+    ''' Find nearest neighbors '''
+    ''' Input: Characters '''
+    ''' Output: k-nearest neighbors '''
     def getWords(self):
 
         words = []
-        k = 5
-        
+        k = 3
+       
         # find the average distance between nearest neighbours
         NNDistances = []
         for character in self.characters:
@@ -132,27 +195,38 @@ class CharacterSet:
             NNDistances.append(nearestNeighbourDistance)
         avgNNDistance = sum(NNDistances)/len(NNDistances)
 
-        maxDistance = avgNNDistance*2
+        maxDistance = avgNNDistance*3
         #maxDistance = avgNNDistance*20000
         for character in self.characters:
+            #print ("Finding a a nn of ",character.x,character.y)
             queryResult = self.NNTree.query(character.coordinate, k=k)
             distances = queryResult[0]
             neighbours = queryResult[1]
             for i in range(1,k):
                 if distances[i] < maxDistance:
+                #if True:
                     neighbour = self.characters[neighbours[i]]
                     character.nearestNeighbours.append(neighbour)
-
+                    #print (i,"th nn!", "dist:", distances[i], " neighbor:(",neighbour.x,",",neighbour.y,")")
+        
+        #self.characters = sorted(self.characters, key=lambda character: (character.y, character.x))    
+        self.characters = sorted(self.characters, key=lambda character: (character.x))    
         for character in self.characters:
+            #print ("Deciding wordness of (",character.x,character.y,")")
             if character.parentWord == None:
+                #print ("(",character.x,character.y,") is a parent!")
                 if len(character.nearestNeighbours) >= 0:
+                    #print ("(",character.x,character.y,") is a word!!!!")
                     word = Word([character])
                     word.findTuples()
                     words.append(word)
-                    #print "Tuples: ", word.angles
-                    
-                    
-                
+        '''
+        print "Total ", len(words), " words are found."
+        for idx, word in enumerate(words):
+            print "[",idx,"] word:"
+            for idx_char, character in enumerate(word.characters):
+                print "**[", idx_char, "] char info.. ", "(",character.x,",",character.y,")"
+        '''        
         return words
 
     def paint(self, image, color=colors.BLUE):
@@ -190,6 +264,8 @@ class Word:
         
         self.characters.add(character)
 
+    ''' paint '''
+    ''' Draw a line between characters '''
     def paint(self, image, color=colors.YELLOW):
 
         for character in self.characters:
@@ -200,5 +276,11 @@ class Word:
                 image = line.paint(image, color)
 
         return image
+        
+#class Line:
+#    def __init__(self, words=[]):
+#        self.words = set(words)
+#    def update():
+        
         
 
