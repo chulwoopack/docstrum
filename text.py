@@ -80,7 +80,7 @@ class CharacterSet:
         image = threshold(image)
         image = threshold(image, cv2.THRESH_OTSU, method=cv2.THRESH_BINARY)
 
-        if True:
+        if False:
             cv2.imshow('binarized', image)
             cv2.waitKey()
 
@@ -202,12 +202,16 @@ class CharacterSet:
             queryResult = self.NNTree.query(character.coordinate, k=k)
             distances = queryResult[0]
             neighbours = queryResult[1]
+            #print("...",character.coordinate,"'s nn ... ")
             for i in range(1,k):
                 if distances[i] < maxDistance:
                 #if True:
-                    neighbour = self.characters[neighbours[i]]
-                    character.nearestNeighbours.append(neighbour)
-                    #print (i,"th nn!", "dist:", distances[i], " neighbor:(",neighbour.x,",",neighbour.y,")")
+                    # check if it is a nn in horizontal way
+                    #print("is...",self.characters[neighbours[i]],"..and...",abs(self.characters[neighbours[i]].y-character.y))
+                    if(abs(self.characters[neighbours[i]].y-character.y) < avgNNDistance/2):
+                        neighbour = self.characters[neighbours[i]]
+                        character.nearestNeighbours.append(neighbour)
+                        #print (i,"th nn!", "dist:", distances[i], " neighbor:(",neighbour.x,",",neighbour.y,")")
         
         #self.characters = sorted(self.characters, key=lambda character: (character.y, character.x))    
         self.characters = sorted(self.characters, key=lambda character: (character.x))    
