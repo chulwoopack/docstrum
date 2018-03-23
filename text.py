@@ -8,6 +8,9 @@ from box import Box
 from dimension import Dimension
 from scipy import spatial
 
+import itertools
+import operator
+
 def threshold(image, threshold=colors.greyscale.MID_GREY, method=cv2.THRESH_BINARY_INV):
     retval, dst = cv2.threshold(image, threshold, colors.greyscale.WHITE, method)
     return dst
@@ -81,7 +84,8 @@ class CharacterSet:
         image = threshold(image, cv2.THRESH_OTSU, method=cv2.THRESH_BINARY)
 
         if False:
-            cv2.imshow('binarized', image)
+            imS = cv2.resize(image, (800, 800))
+            cv2.imshow('binarized', imS)
             cv2.waitKey()
 
         for contour in self.getContours(image):
@@ -97,8 +101,8 @@ class CharacterSet:
                 continue
                 
             #if box.area > 50:
-            if box.area > 10:
-            #if True:
+            #if box.area > 10:
+            if True:
                 characters.append(character)
 
         print "Total ", len(characters), " characters are found."
@@ -177,7 +181,29 @@ class CharacterSet:
                     within_line_nn_group.append(character.nearestNeighbours[1])
         print "Found group: ", within_line_nn_groups
     '''
-        
+       
+    ''' most_common '''
+    ''' Find the most common element in a list '''
+    ''' Input: A list '''
+    ''' Output: The most common element '''    
+    def most_common(self,L):
+        # get an iterable of (item, iterable) pairs
+        SL = sorted((x, i) for i, x in enumerate(L))
+        # print 'SL:', SL
+        groups = itertools.groupby(SL, key=operator.itemgetter(0))
+        # auxiliary function to get "quality" for an item
+        def _auxfun(g):
+            item, iterable = g
+            count = 0
+            min_index = len(L)
+            for _, where in iterable:
+                count += 1
+                min_index = min(min_index, where)
+            # print 'item %r, count %r, minind %r' % (item, count, min_index)
+            return count, -min_index
+        # pick the highest-count/earliest item
+        return max(groups, key=_auxfun)[0]
+    
     ''' getWords '''
     ''' Find nearest neighbors '''
     ''' Input: Characters '''
@@ -185,16 +211,20 @@ class CharacterSet:
     def getWords(self):
 
         words = []
-        k = 3
+        k = 5
+        mode = 'horizontal' # mode = ['default','horizontal','vertical']
+        #EPS = 1e-2
        
         # find the average distance between nearest neighbours
         NNDistances = []
+        NNHorizontalDistances = []
+        NNVerticalDistances = []
         for character in self.characters:
             result = self.NNTree.query(character.toArray(), k=k)  # we only want nearest neighbour, but the first result will be the point matching itself.
             nearestNeighbourDistance = result[0][1]
             NNDistances.append(nearestNeighbourDistance)
         avgNNDistance = sum(NNDistances)/len(NNDistances)
-
+        
         maxDistance = avgNNDistance*3
         #maxDistance = avgNNDistance*20000
         for character in self.characters:
@@ -202,16 +232,52 @@ class CharacterSet:
             queryResult = self.NNTree.query(character.coordinate, k=k)
             distances = queryResult[0]
             neighbours = queryResult[1]
-            #print("...",character.coordinate,"'s nn ... ")
             for i in range(1,k):
-                if distances[i] < maxDistance:
-                #if True:
-                    # check if it is a nn in horizontal way
-                    #print("is...",self.characters[neighbours[i]],"..and...",abs(self.characters[neighbours[i]].y-character.y))
-                    if(abs(self.characters[neighbours[i]].y-character.y) < avgNNDistance/2):
+                if mode == 'horizontal':
+                    ###################################
+                    # Transitive Closure - Horizontal #
+                    ###################################
+                    #if(abs(self.characters[neighbours[i]].y-character.y) < avgNNDistance/2):
+                    neighbour = self.characters[neighbours[i]]
+                    line = g.Line([character.coordinate, neighbour.coordinate])
+                    angle = line.calculateAngle(line.start, line.end)
+                    if(abs(angle.canonical) <= 0.261799): # 15(degree) = 0.261799(rad), 30(degree) = 0.523599(rad)
+                        character.nearestNeighbours.append(neighbour)
+                        NNHorizontalDistances.append(distances[i])
+                        #print (i,"th nn!", "dist:", distances[i], " neighbor:(",neighbour.x,",",neighbour.y,")")
+                    # Below is just for calculating the most common vertical distance purpose...
+                    if(1.309 <= abs(angle.canonical) <= 1.8326): # 75(degree)=1.309(rad), 105(degree)=1.8326(rad) 60(degree)=1.0472(rad), 90(degree)=1.5708(rad), 120(degree)=2.0944(rad)
+                        NNVerticalDistances.append(distances[i])
+                elif mode == 'vertical': # This code might be deleted in future..?
+                    ###################################
+                    # Transitive Closure - Vertical   #
+                    ###################################                    
+                    #if(abs(self.characters[neighbours[i]].x-character.x) < avgNNDistance/2):
+                    neighbour = self.characters[neighbours[i]]
+                    line = g.Line([character.coordinate, neighbour.coordinate])
+                    angle = line.calculateAngle(line.start, line.end)
+                    if(1.309 <= abs(angle.canonical) <= 1.8326): # 75(degree)=1.309(rad), 105(degree)=1.8326(rad) 60(degree)=1.0472(rad), 90(degree)=1.5708(rad), 120(degree)=2.0944(rad)
+                        character.nearestNeighbours.append(neighbour)
+                        NNVerticalDistances.append(distances[i])
+#                        print (i,"th nn!", "dist:", distances[i], " neighbor:(",neighbour.x,",",neighbour.y,") angle:",angle.canonical)
+                else:
+                    ###################################
+                    # Transitive Closure - Default    #
+                    ###################################
+                    # Find nn in every direction within maxDistance
+                    if distances[i] < maxDistance:
                         neighbour = self.characters[neighbours[i]]
                         character.nearestNeighbours.append(neighbour)
-                        #print (i,"th nn!", "dist:", distances[i], " neighbor:(",neighbour.x,",",neighbour.y,")")
+        print("average NN distance: ",avgNNDistance)
+        if mode == 'horizontal':
+            avgHorizontalNNDistance = sum(NNHorizontalDistances)/(len(NNHorizontalDistances))
+            print("average NN horizontal distance: ",avgHorizontalNNDistance)
+            avgVerticalNNDistance = sum(NNVerticalDistances)/(len(NNVerticalDistances))
+            print("average NN vertical distance: ",avgVerticalNNDistance)
+        elif mode == 'vertical':
+            #print("Major NN vertical distance: ",self.most_common(NNVerticalDistances))
+            avgVerticalNNDistance = sum(NNVerticalDistances)/(len(NNVerticalDistances))
+            print("average NN vertical distance: ",avgVerticalNNDistance)
         
         #self.characters = sorted(self.characters, key=lambda character: (character.y, character.x))    
         self.characters = sorted(self.characters, key=lambda character: (character.x))    

@@ -14,6 +14,9 @@ import numpy
 import matplotlib.pyplot as plt
 import ntpath
 
+import itertools # For mostcommon
+import operator  # For mostcommon
+
 stopwatch = Stopwatch()
 
 class Page:
@@ -27,12 +30,21 @@ class Page:
         self.lines = []
         greyscaleImage = cv2.imread(path, cv2.CV_LOAD_IMAGE_GRAYSCALE)
         self.display(greyscaleImage)
+        self.orientations = []
+        self.dists = []
         
         # PREPROCESSING START - NOISE REMOVAL
+        ## Blurring
         #greyscaleImage = cv2.medianBlur(greyscaleImage,3)
+        ## Closing
         kernel = numpy.ones((5,5),numpy.uint8)
-        greyscaleImage = cv2.erode(greyscaleImage,kernel,iterations = 1)
-        self.display(greyscaleImage)
+        
+        ## Opening
+        #kernel = numpy.ones((5,5),numpy.uint8)
+        greyscaleImage = cv2.morphologyEx(greyscaleImage, cv2.MORPH_CLOSE, kernel)
+        greyscaleImage = cv2.morphologyEx(greyscaleImage, cv2.MORPH_OPEN, kernel)
+        #greyscaleImage = cv2.morphologyEx(greyscaleImage, cv2.MORPH_CLOSE, kernel)
+        #self.display(greyscaleImage)
         # PREPROCESSING STOP
         
         colorImage = cv2.imread(path, cv2.CV_LOAD_IMAGE_COLOR)
@@ -77,7 +89,26 @@ class Page:
         #self.paint(self.image)
         self.paint_textline(self.image)
         #self.display(self.paint_textline(self.image))
-        
+
+
+    def most_common(L):
+        # get an iterable of (item, iterable) pairs
+        SL = sorted((x, i) for i, x in enumerate(L))
+        # print 'SL:', SL
+        groups = itertools.groupby(SL, key=operator.itemgetter(0))
+        # auxiliary function to get "quality" for an item
+        def _auxfun(g):
+            item, iterable = g
+            count = 0
+            min_index = len(L)
+            for _, where in iterable:
+              count += 1
+              min_index = min(min_index, where)
+            # print 'item %r, count %r, minind %r' % (item, count, min_index)
+            return count, -min_index
+        # pick the highest-count/earliest item
+        return max(groups, key=_auxfun)[0]
+
     def nnAngleHist(self, theta, path):
         #print "theta from hist: ", theta
         num_bins = 180
@@ -115,8 +146,11 @@ class Page:
                 r.append(distance)
                 dist_hist.append(distance)
         ax = plt.subplot(111,polar=True)
-        #print "theta = [", theta, "]"
-        #print "r = [", r, "]"
+        #print("The peak of text-line orientation: ",self.most_common(theta_hist))
+        #print("shape of dist_hist: ",numpy.shape(dist_hist))
+        #print("The peak of within-line distance: ",self.most_common(dist_hist))
+        self.orientations = theta_hist
+        self.dists = dist_hist
         ax.scatter(theta,r,sz)
         if self.saveDocstrum:
             plt.savefig(os.path.join(os.path.abspath("./docstrums"),"ds_" + ntpath.basename(path)))
@@ -137,6 +171,7 @@ class Page:
     
     def paint_textline(self, image):
         ratio = 4.0/8.0
+        #ratio = 4.0/4.0
         for word in self.words:
             #dir(word)
             #word.angles
@@ -147,15 +182,17 @@ class Page:
                 #print "nn: ", character.nearestNeighbors
                 points.append([character.x, character.y])
             points.sort(key=lambda x: x[0])
-            #print(points)
+            #print("points:",points)
             w = max(points,key=lambda x: x[0])[0]-min(points,key=lambda x: x[0])[0]
-            #print(w)
+            #print("w:",w)
             h = max(points,key=lambda x: x[1])[1]-min(points,key=lambda x: x[1])[1]
             #print(h)
             dx, dy, x0, y0 = cv2.fitLine(numpy.array(points), cv2.cv.CV_DIST_L2, 0, 0.01, 0.01)
-            start = (int(x0 - dx*w*ratio), int(y0 - dy*w*ratio))
-            #start = (int(x0 - dx*w), int(y0 - dy*w))
-            end = (int(x0 + dx*w*ratio), int(y0 + dy*w*ratio))
+            #print("dx:",dx,", dy:",dy,", x0:",x0,", y0:",y0)
+            #start = (int(x0 - dx*w*ratio), int(y0 - dy*w*ratio))
+            start = (int(min(points,key=lambda x: x[0])[0]),int((dy/dx)*(min(points,key=lambda x: x[0])[0]-x0)+y0))
+            #end = (int(x0 + dx*w*ratio), int(y0 + dy*w*ratio))
+            end = (int(max(points,key=lambda x: x[0])[0]),int((dy/dx)*(max(points,key=lambda x: x[0])[0]-x0)+y0))
             #print(start,end)
             self.lines.append(g.Line([start,end]))
             cv2.line(image, start, end, (0,255,255),2)
