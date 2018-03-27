@@ -42,7 +42,8 @@ class Page:
         ## Opening
         #kernel = numpy.ones((5,5),numpy.uint8)
         greyscaleImage = cv2.morphologyEx(greyscaleImage, cv2.MORPH_CLOSE, kernel)
-        greyscaleImage = cv2.morphologyEx(greyscaleImage, cv2.MORPH_OPEN, kernel)
+        greyscaleImage = cv2.morphologyEx(greyscaleImage, cv2.MORPH_CLOSE, kernel)
+        #greyscaleImage = cv2.morphologyEx(greyscaleImage, cv2.MORPH_OPEN, kernel)
         #greyscaleImage = cv2.morphologyEx(greyscaleImage, cv2.MORPH_CLOSE, kernel)
         #self.display(greyscaleImage)
         # PREPROCESSING STOP

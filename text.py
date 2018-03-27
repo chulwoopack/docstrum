@@ -225,7 +225,7 @@ class CharacterSet:
             NNDistances.append(nearestNeighbourDistance)
         avgNNDistance = sum(NNDistances)/len(NNDistances)
         
-        maxDistance = avgNNDistance*3
+        maxDistance = avgNNDistance*2
         #maxDistance = avgNNDistance*20000
         for character in self.characters:
             #print ("Finding a a nn of ",character.x,character.y)
@@ -241,7 +241,7 @@ class CharacterSet:
                     neighbour = self.characters[neighbours[i]]
                     line = g.Line([character.coordinate, neighbour.coordinate])
                     angle = line.calculateAngle(line.start, line.end)
-                    if(abs(angle.canonical) <= 0.261799): # 15(degree) = 0.261799(rad), 30(degree) = 0.523599(rad)
+                    if(abs(angle.canonical) <= 0.261799 and distances[i] < maxDistance): # 15(degree) = 0.261799(rad), 30(degree) = 0.523599(rad)
                         character.nearestNeighbours.append(neighbour)
                         NNHorizontalDistances.append(distances[i])
                         #print (i,"th nn!", "dist:", distances[i], " neighbor:(",neighbour.x,",",neighbour.y,")")
