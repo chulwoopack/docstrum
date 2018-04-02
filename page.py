@@ -21,7 +21,7 @@ stopwatch = Stopwatch()
 
 class Page:
 
-    def __init__(self, path, showSteps=False, saveDocstrum=False):
+    def __init__(self, path, outputPath, showSteps=False, saveDocstrum=False):
 
         stopwatch.reset(path)
 
@@ -61,7 +61,6 @@ class Page:
         blurredImage = cv2.bilateralFilter(greyscaleImage,9,95,95)
         if showSteps: self.display(blurredImage, title="Bilateral-filter-based Blurred Image")
         _, binaryImage = cv2.threshold(blurredImage,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
-        #binaryImage = cv2.adaptiveThreshold(blurredImage, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 115, 1)
         if showSteps: self.display(binaryImage, title="Otsu-based Binarized Image")
         binaryImage = cv2.bitwise_not(binaryImage)
         if showSteps: self.display(binaryImage, title="Inverted Image")
@@ -81,18 +80,12 @@ class Page:
         if showSteps: self.display(verticalMask, title="MORP. Dilated Image_#2") 
         verticalMask = cv2.blur(verticalMask, (9,9))
         if showSteps: self.display(verticalMask, title="Smoothened Vertical-line Candidates_#2") 
+            
         verticalMask = cv2.dilate(verticalMask, kernel, (-1, -1))
         if showSteps: self.display(verticalMask, title="MORP. Dilated Image_#3") 
         verticalMask = cv2.blur(verticalMask, (9,9))
         if showSteps: self.display(verticalMask, title="Smoothened Vertical-line Candidates_#3")
-        verticalMask = cv2.dilate(verticalMask, kernel, (-1, -1))
-        if showSteps: self.display(verticalMask, title="MORP. Dilated Image_#4") 
-        verticalMask = cv2.blur(verticalMask, (9,9))
-        if showSteps: self.display(verticalMask, title="Smoothened Vertical-line Candidates_#4")
-        verticalMask = cv2.dilate(verticalMask, kernel, (-1, -1))
-        if showSteps: self.display(verticalMask, title="MORP. Dilated Image_#5") 
-        verticalMask = cv2.blur(verticalMask, (9,9))
-        if showSteps: self.display(verticalMask, title="Smoothened Vertical-line Candidates_#5") 
+            
         #verticalMask = cv2.adaptiveThreshold(verticalMask,255, cv2.ADAPTIVE_THRESH_MEAN_C,cv2.THRESH_BINARY,15,-2)
         #_, verticalMask = cv2.threshold(verticalMask,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
         _, verticalMask = cv2.threshold(verticalMask, 1, 255, cv2.THRESH_BINARY)
@@ -106,18 +99,57 @@ class Page:
                 cv2.drawContours(verticalMask_mask, [cnt], -1, 0, -1)
         if showSteps: self.display(cv2.bitwise_not(verticalMask_mask), title="Final Vertical-lines") 
          
-        binaryImage = cv2.bitwise_and(binaryImage, verticalMask_mask)
-        if showSteps: self.display(binaryImage, title="Fully Preprocessed Image") 
+        binaryPreprocessedImage = cv2.bitwise_and(binaryImage, verticalMask_mask)
+        if showSteps: self.display(binaryPreprocessedImage, title="Fully Preprocessed Image") 
         '''
         ###############################
         # VERTICAL LINE REMOVAL - END #
         ###############################
-        
-        #_,binaryImage = cv2.threshold(greyscaleImage, cv2.THRESH_OTSU, colors.greyscale.WHITE, cv2.THRESH_BINARY)
-        _, binaryImage = cv2.threshold(greyscaleImage,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
+            
+        _, binaryImage_o = cv2.threshold(greyscaleImage,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
+        binaryImage_o = cv2.bitwise_not(binaryImage_o)
+        if showSteps: self.display(binaryImage_o, title="Otsu-based Binarized Image") 
+            
+        binaryImage_a = cv2.adaptiveThreshold(greyscaleImage, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 115, 1)
+        binaryImage_a = cv2.bitwise_not(binaryImage_a)
+        if showSteps: self.display(binaryImage_a, title="Adaptive-thresholding-based Binarized Image")
+            
+        binaryImage = cv2.bitwise_or(cv2.bitwise_not(binaryImage_o),cv2.bitwise_not(binaryImage_a))
         binaryImage = cv2.bitwise_not(binaryImage)
-        if showSteps: self.display(binaryImage, title="Otsu-based Binarized Image") 
-          
+        if showSteps: self.display(binaryImage, title="Otsu and Adaptive Binarized Image")
+            
+        verticalsize = binaryImage.shape[0] / 90;
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT,(1,verticalsize))
+        
+        #blurredImage = cv2.bilateralFilter(greyscaleImage,9,95,95)
+        #if showSteps: self.display(blurredImage, title="Bilateral-filter-based Blurred Image")
+        binaryImage_a = cv2.bitwise_not(binaryImage_a)
+        
+        verticalMask = cv2.erode(binaryImage_a, kernel, (-1, -1))
+        if showSteps: self.display(verticalMask, title="MORP. Erosed Image")  
+        verticalMask = cv2.dilate(verticalMask, kernel, (-1, -1))
+        if showSteps: self.display(verticalMask, title="MORP. Dilated Image") 
+        verticalMask = cv2.blur(verticalMask, (9,9))
+        if showSteps: self.display(verticalMask, title="Smoothened Vertical-line Candidates") 
+              
+        _, verticalMask = cv2.threshold(verticalMask, 1, 255, cv2.THRESH_BINARY)
+        if showSteps: self.display(verticalMask, title="Thresholded Vertical-line Candidates") 
+        
+        verticalMask_mask = numpy.ones(binaryImage.shape[:2], dtype="uint8") * 255
+        verticalMask_contours,verticalMask_hierarchy = cv2.findContours(verticalMask, 1, 2)
+        for cnt in verticalMask_contours:
+            x,y,w,h = cv2.boundingRect(cnt)
+            if h>binaryImage.shape[0]/3:
+                cv2.drawContours(verticalMask_mask, [cnt], -1, 0, -1)
+        # testing
+        #verticalMask_mask = cv2.blur(verticalMask_mask, (33,9))
+        #_, verticalMask_mask = cv2.threshold(verticalMask_mask, 1, 255, cv2.THRESH_BINARY)
+        if showSteps: self.display(cv2.bitwise_not(verticalMask_mask), title="Final Vertical-lines") 
+         
+        binaryPreprocessedImage = cv2.bitwise_and(binaryImage, verticalMask_mask)
+        if showSteps: self.display(binaryPreprocessedImage, title="Fully Preprocessed Image") 
+            
+        binaryImage = binaryPreprocessedImage
         self.characters = text.CharacterSet(binaryImage)
         #self.display(binaryImage)
         stopwatch.lap("got characters")
@@ -148,6 +180,7 @@ class Page:
         
         textlineImage = self.find_textline(colorImage)
         self.display(textlineImage, title="Found textlines")
+        cv2.imwrite(outputPath, textlineImage)
         
         self.image = colorImage
 

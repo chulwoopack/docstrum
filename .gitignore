@@ -1,3 +1,6 @@
+# .pyc files
+*.pyc
+
 # Datasets
 docstrums/
 images/
