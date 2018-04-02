@@ -254,6 +254,7 @@ class Line:
         self.end = None
         self.angle = None
         self.group = None
+        self.noise = True
 
         if inputAngle != None:
             inputAngle = Angle(inputAngle)

@@ -2,6 +2,8 @@ import cv2
 import numpy
 import math
 
+import matplotlib.pyplot as plt
+
 import colors
 import geometry as g
 from box import Box
@@ -80,8 +82,7 @@ class CharacterSet:
         characters = []
 
         image = sourceImage.copy()
-        image = threshold(image)
-        image = threshold(image, cv2.THRESH_OTSU, method=cv2.THRESH_BINARY)
+#        image = threshold(image, cv2.THRESH_OTSU, method=cv2.THRESH_BINARY)
 
         if False:
             imS = cv2.resize(image, (800, 800))
@@ -101,8 +102,8 @@ class CharacterSet:
                 continue
                 
             #if box.area > 50:
-            #if box.area > 10:
-            if True:
+            if box.area > 1:
+            #if True:
                 characters.append(character)
 
         print "Total ", len(characters), " characters are found."
@@ -219,13 +220,17 @@ class CharacterSet:
         NNDistances = []
         NNHorizontalDistances = []
         NNVerticalDistances = []
+        remove_counter = 0
         for character in self.characters:
+            remove_counter = remove_counter+1
             result = self.NNTree.query(character.toArray(), k=k)  # we only want nearest neighbour, but the first result will be the point matching itself.
-            nearestNeighbourDistance = result[0][1]
-            NNDistances.append(nearestNeighbourDistance)
+            nearestNeighbourDistance = result[0]
+            for i in xrange(1,k):
+                #print("[%s] nearestNeighbourDistance: %s"%(remove_counter,result[0]))
+                NNDistances.append(nearestNeighbourDistance[i])
         avgNNDistance = sum(NNDistances)/len(NNDistances)
         
-        maxDistance = avgNNDistance*2
+        maxDistance = avgNNDistance*3
         #maxDistance = avgNNDistance*20000
         for character in self.characters:
             #print ("Finding a a nn of ",character.x,character.y)
@@ -246,7 +251,7 @@ class CharacterSet:
                         NNHorizontalDistances.append(distances[i])
                         #print (i,"th nn!", "dist:", distances[i], " neighbor:(",neighbour.x,",",neighbour.y,")")
                     # Below is just for calculating the most common vertical distance purpose...
-                    if(1.309 <= abs(angle.canonical) <= 1.8326): # 75(degree)=1.309(rad), 105(degree)=1.8326(rad) 60(degree)=1.0472(rad), 90(degree)=1.5708(rad), 120(degree)=2.0944(rad)
+                    if(1.309 <= abs(angle.canonical) <= 1.8326 and distances[i] < maxDistance): # 75(degree)=1.309(rad), 105(degree)=1.8326(rad) 60(degree)=1.0472(rad), 90(degree)=1.5708(rad), 120(degree)=2.0944(rad)
                         NNVerticalDistances.append(distances[i])
                 elif mode == 'vertical': # This code might be deleted in future..?
                     ###################################
@@ -268,18 +273,44 @@ class CharacterSet:
                     if distances[i] < maxDistance:
                         neighbour = self.characters[neighbours[i]]
                         character.nearestNeighbours.append(neighbour)
-        print("average NN distance: ",avgNNDistance)
-        if mode == 'horizontal':
-            avgHorizontalNNDistance = sum(NNHorizontalDistances)/(len(NNHorizontalDistances))
-            print("average NN horizontal distance: ",avgHorizontalNNDistance)
-            avgVerticalNNDistance = sum(NNVerticalDistances)/(len(NNVerticalDistances))
-            print("average NN vertical distance: ",avgVerticalNNDistance)
-        elif mode == 'vertical':
-            #print("Major NN vertical distance: ",self.most_common(NNVerticalDistances))
-            avgVerticalNNDistance = sum(NNVerticalDistances)/(len(NNVerticalDistances))
-            print("average NN vertical distance: ",avgVerticalNNDistance)
         
-        #self.characters = sorted(self.characters, key=lambda character: (character.y, character.x))    
+        num_bins = int((numpy.max(NNDistances)-numpy.min(NNDistances)+1)/10)
+        n, bins, patches = plt.hist(NNDistances, num_bins, facecolor='orange', alpha=0.5)
+        plt.show()
+        print("Total %d all NNs" %len(NNDistances))
+        print("average NN distance: ",avgNNDistance)
+        
+        num_bins = int((numpy.max(NNHorizontalDistances)-numpy.min(NNHorizontalDistances)+1)/10)
+        n, bins, patches = plt.hist(NNHorizontalDistances, num_bins, facecolor='orange', alpha=0.5)
+        plt.show()
+        print("Total %d hor NNs" %len(NNHorizontalDistances))
+        dist_peaks = []
+        n_copy = n.copy()
+        n_copy[::-1].sort() # sort in reverse way
+        for i in xrange(num_bins):
+            _max_idx = numpy.where(n == n_copy[i])    # Find peak
+            for j in xrange(len(_max_idx[0])):
+                dist_peaks.append(int(bins[_max_idx[0][j]]))
+        print ("Distance peaks: %s" %dist_peaks)
+        avgHorizontalNNDistance = sum(NNHorizontalDistances)/(len(NNHorizontalDistances))
+        print("average NN horizontal distance: %.2f\n" %avgHorizontalNNDistance)
+            
+        
+        num_bins = int((numpy.max(NNVerticalDistances)-numpy.min(NNVerticalDistances)+1)/10)
+        n, bins, patches = plt.hist(NNVerticalDistances, num_bins, facecolor='orange', alpha=0.5)
+        plt.show()
+        print("Total %d ver NNs" %len(NNVerticalDistances))
+        dist_peaks = []
+        n_copy = n.copy()
+        n_copy[::-1].sort() # sort in reverse way
+        for i in xrange(num_bins):
+            _max_idx = numpy.where(n == n_copy[i])    # Find peak
+            for j in xrange(len(_max_idx[0])):
+                dist_peaks.append(int(bins[_max_idx[0][j]]))
+        print ("Distance peaks: %s" %dist_peaks)
+        avgVerticalNNDistance = sum(NNVerticalDistances)/(len(NNVerticalDistances))
+        print("average NN vertical distance: %.2f\n" %avgVerticalNNDistance)
+        
         self.characters = sorted(self.characters, key=lambda character: (character.x))    
         for character in self.characters:
             #print ("Deciding wordness of (",character.x,character.y,")")

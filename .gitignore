@@ -1,1 +1,8 @@
+# Datasets
+docstrums/
+images/
+output/
+images_bank
+
+# For Mac OS
 .DS_Store

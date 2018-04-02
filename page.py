@@ -29,7 +29,6 @@ class Page:
         self.saveDocstrum = saveDocstrum
         self.lines = []
         greyscaleImage = cv2.imread(path, cv2.CV_LOAD_IMAGE_GRAYSCALE)
-        self.display(greyscaleImage)
         self.orientations = []
         self.dists = []
         
@@ -41,8 +40,9 @@ class Page:
         
         ## Opening
         #kernel = numpy.ones((5,5),numpy.uint8)
-        greyscaleImage = cv2.morphologyEx(greyscaleImage, cv2.MORPH_CLOSE, kernel)
-        greyscaleImage = cv2.morphologyEx(greyscaleImage, cv2.MORPH_CLOSE, kernel)
+        #greyscaleImage = cv2.morphologyEx(greyscaleImage, cv2.MORPH_CLOSE, kernel)
+        #greyscaleImage = cv2.morphologyEx(greyscaleImage, cv2.MORPH_CLOSE, kernel)
+        
         #greyscaleImage = cv2.morphologyEx(greyscaleImage, cv2.MORPH_OPEN, kernel)
         #greyscaleImage = cv2.morphologyEx(greyscaleImage, cv2.MORPH_CLOSE, kernel)
         #self.display(greyscaleImage)
@@ -50,10 +50,76 @@ class Page:
         
         colorImage = cv2.imread(path, cv2.CV_LOAD_IMAGE_COLOR)
 
-        if showSteps:
-            self.display(greyscaleImage)
-
-        self.characters = text.CharacterSet(greyscaleImage)
+        if showSteps: self.display(greyscaleImage, title="Original Image")
+    
+        #################################
+        # VERTICAL LINE REMOVAL - START #
+        #################################
+        '''
+        #blurredImage = cv2.GaussianBlur(greyscaleImage,(5,5),0)
+        #if showSteps: self.display(blurredImage, title="Gaussian-based Blurred Image")
+        blurredImage = cv2.bilateralFilter(greyscaleImage,9,95,95)
+        if showSteps: self.display(blurredImage, title="Bilateral-filter-based Blurred Image")
+        _, binaryImage = cv2.threshold(blurredImage,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
+        #binaryImage = cv2.adaptiveThreshold(blurredImage, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 115, 1)
+        if showSteps: self.display(binaryImage, title="Otsu-based Binarized Image")
+        binaryImage = cv2.bitwise_not(binaryImage)
+        if showSteps: self.display(binaryImage, title="Inverted Image")
+        
+#        kernel_size = (3,3)
+        verticalsize = binaryImage.shape[0] / 90;
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT,(1,verticalsize))
+        
+        verticalMask = cv2.erode(binaryImage, kernel, (-1, -1))
+        if showSteps: self.display(verticalMask, title="MORP. Erosed Image")  
+        verticalMask = cv2.dilate(verticalMask, kernel, (-1, -1))
+        if showSteps: self.display(verticalMask, title="MORP. Dilated Image") 
+        verticalMask = cv2.blur(verticalMask, (9,9))
+        if showSteps: self.display(verticalMask, title="Smoothened Vertical-line Candidates") 
+        # Recursive 
+        verticalMask = cv2.dilate(verticalMask, kernel, (-1, -1))
+        if showSteps: self.display(verticalMask, title="MORP. Dilated Image_#2") 
+        verticalMask = cv2.blur(verticalMask, (9,9))
+        if showSteps: self.display(verticalMask, title="Smoothened Vertical-line Candidates_#2") 
+        verticalMask = cv2.dilate(verticalMask, kernel, (-1, -1))
+        if showSteps: self.display(verticalMask, title="MORP. Dilated Image_#3") 
+        verticalMask = cv2.blur(verticalMask, (9,9))
+        if showSteps: self.display(verticalMask, title="Smoothened Vertical-line Candidates_#3")
+        verticalMask = cv2.dilate(verticalMask, kernel, (-1, -1))
+        if showSteps: self.display(verticalMask, title="MORP. Dilated Image_#4") 
+        verticalMask = cv2.blur(verticalMask, (9,9))
+        if showSteps: self.display(verticalMask, title="Smoothened Vertical-line Candidates_#4")
+        verticalMask = cv2.dilate(verticalMask, kernel, (-1, -1))
+        if showSteps: self.display(verticalMask, title="MORP. Dilated Image_#5") 
+        verticalMask = cv2.blur(verticalMask, (9,9))
+        if showSteps: self.display(verticalMask, title="Smoothened Vertical-line Candidates_#5") 
+        #verticalMask = cv2.adaptiveThreshold(verticalMask,255, cv2.ADAPTIVE_THRESH_MEAN_C,cv2.THRESH_BINARY,15,-2)
+        #_, verticalMask = cv2.threshold(verticalMask,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
+        _, verticalMask = cv2.threshold(verticalMask, 1, 255, cv2.THRESH_BINARY)
+        if showSteps: self.display(verticalMask, title="Thresholded Vertical-line Candidates") 
+        
+        verticalMask_mask = numpy.ones(binaryImage.shape[:2], dtype="uint8") * 255
+        verticalMask_contours,verticalMask_hierarchy = cv2.findContours(verticalMask, 1, 2)
+        for cnt in verticalMask_contours:
+            x,y,w,h = cv2.boundingRect(cnt)
+            if h>binaryImage.shape[0]/3:
+                cv2.drawContours(verticalMask_mask, [cnt], -1, 0, -1)
+        if showSteps: self.display(cv2.bitwise_not(verticalMask_mask), title="Final Vertical-lines") 
+         
+        binaryImage = cv2.bitwise_and(binaryImage, verticalMask_mask)
+        if showSteps: self.display(binaryImage, title="Fully Preprocessed Image") 
+        '''
+        ###############################
+        # VERTICAL LINE REMOVAL - END #
+        ###############################
+        
+        #_,binaryImage = cv2.threshold(greyscaleImage, cv2.THRESH_OTSU, colors.greyscale.WHITE, cv2.THRESH_BINARY)
+        _, binaryImage = cv2.threshold(greyscaleImage,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
+        binaryImage = cv2.bitwise_not(binaryImage)
+        if showSteps: self.display(binaryImage, title="Otsu-based Binarized Image") 
+          
+        self.characters = text.CharacterSet(binaryImage)
+        #self.display(binaryImage)
         stopwatch.lap("got characters")
         # words = [word, word, ..., word]
         # words = [append, count, extend, index, insert, pop, remove, reverse, sort]
@@ -80,6 +146,8 @@ class Page:
         #ax.scatter(theta,r)
         #plt.show()
         
+        textlineImage = self.find_textline(colorImage)
+        self.display(textlineImage, title="Found textlines")
         
         self.image = colorImage
 
@@ -88,9 +156,11 @@ class Page:
         
         #self.drawTextLine(self.words,colorImage)
         #self.paint(self.image)
-        self.paint_textline(self.image)
+        
+        #self.display_textline(textlineImage)
+        
         #self.display(self.paint_textline(self.image))
-
+        print "Done."
 
     def most_common(L):
         # get an iterable of (item, iterable) pairs
@@ -103,8 +173,8 @@ class Page:
             count = 0
             min_index = len(L)
             for _, where in iterable:
-              count += 1
-              min_index = min(min_index, where)
+                count += 1
+                min_index = min(min_index, where)
             # print 'item %r, count %r, minind %r' % (item, count, min_index)
             return count, -min_index
         # pick the highest-count/earliest item
@@ -118,6 +188,7 @@ class Page:
             plt.savefig(os.path.join(os.path.abspath("./docstrums"),"ds_nnAngle_" + ntpath.basename(path)))
         plt.show()
         
+        
     def nnDistHist(self, dist, path):
         num_bins = int(numpy.max(dist)-numpy.min(dist)+1)
         #num_bins = 2*int(numpy.max(dist)+1)
@@ -127,7 +198,58 @@ class Page:
         if self.saveDocstrum:
             plt.savefig(os.path.join(os.path.abspath("./docstrums"),"ds_nnDist_" + ntpath.basename(path)))
         plt.show()
-    
+        
+        dist_peaks = []
+        n_copy = n.copy()
+        n_copy[::-1].sort() # sort in reverse way
+        THRESHOLD_DIST_WIDTH = 15
+        for i in xrange(num_bins):
+            _max_idx = numpy.where(n == n_copy[i])    # Find peak
+            if len(_max_idx[0])>1:                    # If ties,
+                _max = _max_idx[0][int(len(_max_idx[0])/2)]  # get middle
+            else:
+                _max = _max_idx[0][0]
+            dist_peaks.append(int(_max+numpy.min(dist)))
+        print ("Distance peaks: %s" %dist_peaks)
+        '''
+        first_group_offset = -1
+        second_group_offset = -1
+        _min = _max = dist_peaks[0]
+        for i in xrange(len(dist_peaks)):
+            #print("Ele: %d" %dist_peaks[i])
+            if first_group_offset>-1 and second_group_offset>-1:
+                break
+            if _min <= dist_peaks[i] <= _max:
+                #print("...within [%d,%d]" %(_min,_max))
+                continue
+            elif abs(dist_peaks[i] -_min) <= THRESHOLD_DIST_WIDTH:
+                if dist_peaks[i]<_min:
+                    _min = dist_peaks[i]
+                    #print("...new min %d" %_min)
+                elif _max < dist_peaks[i]:
+                    _max = dist_peaks[i]
+                    #print("...new max %d" %_max)    
+                continue
+            elif abs(_max - dist_peaks[i]) <= THRESHOLD_DIST_WIDTH:
+                if _max < dist_peaks[i]:
+                    _max = dist_peaks[i]
+                    #print("...new max %d" %_max)   
+                elif dist_peaks[i]<_min:
+                    _min = dist_peaks[i]
+                    #print("...new min %d" %_min)
+                continue
+            else:
+                if first_group_offset == -1:
+                    first_group_offset = i
+                    #print("...found first group!")
+                    _min = dist_peaks[i]
+                    _max = dist_peaks[i]
+                else:
+                    second_group_offset = i
+        print ("first group: %s and avg: %d" %(dist_peaks[:first_group_offset],numpy.mean(dist_peaks[:first_group_offset])))
+        print ("second group: %s and avg: %d" %(dist_peaks[first_group_offset:second_group_offset],numpy.mean(dist_peaks[first_group_offset:second_group_offset])))
+
+        '''
     
     def buildDocstrum(self, path):
         theta = []
@@ -158,19 +280,20 @@ class Page:
         if self.showSteps:
             plt.show()
             self.nnAngleHist(theta_hist,path)
-            self.nnDistHist(dist_hist,path)
+            #self.nnDistHist(dist_hist,path)
     
     ''' paint '''
     ''' color words '''
     def paint(self, image):
 
-        print len(self.words)
+        #print len(self.words)
         for word in self.words:
             image = word.paint(image, colors.RED)
 
         return image
     
-    def paint_textline(self, image):
+    def find_textline(self,image):
+        image = image.copy()
         ratio = 4.0/8.0
         #ratio = 4.0/4.0
         for word in self.words:
@@ -205,7 +328,7 @@ class Page:
         image = self.paint(image)
         #image = self.paint_textline(image)
         cv2.imwrite(path, image)
-
+        
     def display(self, image, boundingBox=(800,800), title='Image'):
 
         stopwatch.pause()
